@@ -79,6 +79,8 @@ class ActorPPOTrainer(BasePPOTrainer):
             os.makedirs(self.strategy.args.use_tensorboard, exist_ok=True)
             log_dir = os.path.join(self.strategy.args.use_tensorboard, self.strategy.args.wandb_run_name)
             self._tensorboard = SummaryWriter(log_dir=log_dir)
+        else:
+            log_dir = None
 
         self.experience_maker = RemoteExperienceMaker(
             self.actor,
@@ -93,6 +95,7 @@ class ActorPPOTrainer(BasePPOTrainer):
             self.reward_fn,
             vllm_engines=self.vllm_engines,
             packing_samples=self.strategy.args.packing_samples,
+            log_dir=log_dir,
         )
 
         backend = getattr(self.strategy.args, "vllm_sync_backend", "nccl")
@@ -198,9 +201,9 @@ class ActorPPOTrainer(BasePPOTrainer):
                 disable=not self.strategy.is_rank_0(),
             )
 
-            for rand_prompts, labels in self.prompts_dataloader:
+            for rand_prompts, labels, raw_prompts in self.prompts_dataloader:
                 for i, experience in enumerate(
-                    self.experience_maker.make_experience_list(rand_prompts, labels, **self.generate_kwargs)
+                    self.experience_maker.make_experience_list(rand_prompts, labels, raw_prompts, **self.generate_kwargs)
                 ):
                     if i == 0:
                         output = self.tokenizer.batch_decode(
@@ -692,7 +695,8 @@ class ActorModelRayActor(BasePPORole):
             actor_optim,
             num_warmup_steps=math.ceil(max_steps * args.lr_warmup_ratio),
             num_training_steps=max_steps,
-            scheduler_specific_kwargs={"min_lr": args.actor_learning_rate * 0.1},
+            scheduler_specific_kwargs={"min_lr": args.actor_learning_rate * 0.1
+                                       if args.actor_min_learning_rate == -1 else args.actor_min_learning_rate},
         )
 
         if args.gradient_checkpointing:
@@ -849,7 +853,7 @@ class ActorModelRayActor(BasePPORole):
 
         # broadcast checkpoint
         ckpt_path = os.path.join(args.ckpt_path, "_actor")
-        if args.load_checkpoint and os.path.exists(ckpt_path) and not vllm_engines is None:
+        if args.load_checkpoint and os.path.exists(ckpt_path) and vllm_engines is not None:
             # vLLM wakeup when vllm_enable_sleep
             if self.strategy.args.vllm_enable_sleep:
                 batch_vllm_engine_call(vllm_engines, "wake_up")

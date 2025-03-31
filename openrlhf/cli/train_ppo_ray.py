@@ -29,7 +29,7 @@ def _validate_args(args):
         args.rollout_batch_size % actor_world_size == 0
     ), f"rollout_bach_size must be divisible by actor_world_size, got {args.rollout_batch_size} and {actor_world_size}"
 
-    assert args.zero_stage != 3 or args.vllm_num_engines > 0, f"ZeRO-3 is only supported when vLLM enabled"
+    assert args.zero_stage != 3 or args.vllm_num_engines > 0, "ZeRO-3 is only supported when vLLM enabled"
 
     if args.vllm_num_engines > 0:
         assert (
@@ -63,7 +63,7 @@ def train(args):
             assert (
                 args.actor_num_nodes == args.ref_num_nodes
                 and args.actor_num_gpus_per_node == args.ref_num_gpus_per_node
-            ), f"num_nodes and num_gpus_per_node must be the same when colocate actor and ref model."
+            ), "num_nodes and num_gpus_per_node must be the same when colocate actor and ref model."
 
         bundles = [{"GPU": 1, "CPU": 1} for _ in range(args.actor_num_nodes * args.actor_num_gpus_per_node)]
         pg = placement_group(bundles, strategy="PACK")
@@ -124,7 +124,7 @@ def train(args):
         assert (
             args.critic_num_nodes == args.reward_num_nodes
             and args.critic_num_gpus_per_node == args.reward_num_gpus_per_node
-        ), f"num_nodes and num_gpus_per_node must be the same when colocate critic and reward model."
+        ), "num_nodes and num_gpus_per_node must be the same when colocate critic and reward model."
 
         bundles = [{"GPU": 1, "CPU": 1} for _ in range(args.critic_num_nodes * args.critic_num_gpus_per_node)]
         pg = placement_group(bundles, strategy="PACK")
@@ -268,7 +268,7 @@ if __name__ == "__main__":
     parser.add_argument("--gradient_checkpointing", action="store_true", default=False)
     parser.add_argument("--torch_compile", action="store_true", default=False)
     parser.add_argument("--bf16", action="store_true", default=False, help="Enable bfloat16")
-    ## Make EMA as an optional feature
+    # Make EMA as an optional feature
     parser.add_argument("--enable_ema", action="store_true", help="Enable EMA checkpoint for the model.")
     parser.add_argument("--zpg", type=int, default=1, help="ZeRO++ max partition size")
     parser.add_argument("--adam_offload", action="store_true", default=False, help="Offload Adam Optimizer")
@@ -332,6 +332,8 @@ if __name__ == "__main__":
     parser.add_argument("--save_value_network", action="store_true", default=False, help="Save critic model")
     parser.add_argument("--actor_learning_rate", type=float, default=1e-6)
     parser.add_argument("--critic_learning_rate", type=float, default=9e-6)
+    parser.add_argument("--actor_min_learning_rate", type=float, default=-1)
+    parser.add_argument("--critic_min_learning_rate", type=float, default=-1)
     parser.add_argument("--lr_warmup_ratio", type=float, default=0.03)
     parser.add_argument("--kl_target", type=float, default=None)
     parser.add_argument("--init_kl_coef", type=float, default=0.01, help="KL penalty in PPO")

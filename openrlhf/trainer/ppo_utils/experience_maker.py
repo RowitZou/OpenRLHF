@@ -1,3 +1,5 @@
+import os
+import json
 import time
 from abc import ABC
 from copy import deepcopy
@@ -29,6 +31,90 @@ def pin_memory(tensor: Union[torch.Tensor, list[torch.Tensor]]):
     if isinstance(tensor, list):
         return [pin_memory(t) for t in tensor]
     return tensor.pin_memory() if isinstance(tensor, torch.Tensor) else tensor
+
+
+class RewardModelInputTool():
+    """
+    Tokenization tool for reward model.
+    This class is used to tokenize the input and output sequences for the reward model.
+    """
+    def __init__(self, tokenizer, max_length=16384, max_response_length=4096, response_cut_side="right"):
+        self.tokenizer = tokenizer
+        # for final reward token and one <|reward|> token and two '\n' tokens
+        self.max_length = max_length - 4
+        self.max_response_length = max_response_length
+        self.response_cut_side = response_cut_side
+
+    def construct_rm_input_str(self, p1, p2, r1, r2, wrapper="sft") -> str:
+
+        """
+        Construct the input string for the reward model.
+        Args:
+            p1: The prompt of reference.
+            p2: The prompt of model output.
+            r1: The response of reference.
+            r2: The response of model output.
+            In single mode, p1 and p2 are the same.
+            wrapper: The wrapper type. Can be "sft" or "pretrain".
+        Returns:
+            The constructed input string for the reward model.
+        """
+        p1 = "\n".join([e["content"] for e in p1]) if isinstance(p1, list) else p1
+        p2 = "\n".join([e["content"] for e in p2]) if isinstance(p2, list) else p2
+        r1 = "\n".join([e["content"] for e in r1]) if isinstance(r1, list) else r1
+        r2 = "\n".join([e["content"] for e in r2]) if isinstance(r2, list) else r2
+
+        p1_ids = self.tokenizer.encode(p1, add_special_tokens=True)
+        p2_ids = self.tokenizer.encode(p2, add_special_tokens=True)
+        r1_ids = self.tokenizer.encode(r1, add_special_tokens=True)
+        r2_ids = self.tokenizer.encode(r2, add_special_tokens=True)
+
+        if len(r1_ids) > self.max_response_length:
+            print(
+                f"sequence length {len(r1_ids)} is "
+                f"larger than max_response_length {self.max_response_length}",
+            )
+            if self.response_cut_side == "right":
+                r1_ids = r1_ids[:self.max_response_length]
+            else:
+                r1_ids = r1_ids[-self.max_response_length:]
+        if len(r2_ids) > self.max_response_length:
+            print(
+                f"sequence length {len(r2_ids)} is "
+                f"larger than max_response_length {self.max_response_length}",
+            )
+            if self.response_cut_side == "right":
+                r2_ids = r2_ids[:self.max_response_length]
+            else:
+                r2_ids = r2_ids[-self.max_response_length:]
+
+        max_prompt_length = (self.max_length - len(r1_ids) - len(r2_ids)) // 2
+
+        if len(p1_ids) > max_prompt_length:
+            print(
+                f"sequence length {len(p1_ids)} is "
+                f"larger than max_prompt_length {max_prompt_length}",
+            )
+            p1_ids = p1_ids[-max_prompt_length:]
+        if len(p2_ids) > max_prompt_length:
+            print(
+                f"sequence length {len(p2_ids)} is "
+                f"larger than max_prompt_length {max_prompt_length}",
+            )
+            p2_ids = p2_ids[-max_prompt_length:]
+
+        p1 = self.tokenizer.decode(p1_ids, skip_special_tokens=True)
+        p2 = self.tokenizer.decode(p2_ids, skip_special_tokens=True)
+        r1 = self.tokenizer.decode(r1_ids, skip_special_tokens=True)
+        r2 = self.tokenizer.decode(r2_ids, skip_special_tokens=True)
+
+        # Fit the template of RMP
+        _reference_cat = p1 + r1 if wrapper == "pretrain" or len(r1) == "" else p1 + "\n" + r1
+        _output_cat = p2 + r2 if wrapper == "pretrain" or len(r2) == "" else p2 + "\n" + r2
+
+        final_txt = _reference_cat + "<|reward|>" + _output_cat
+
+        return final_txt
 
 
 @dataclass
@@ -192,17 +278,21 @@ class BaseExperienceMaker(ABC):
 
 
 class RemoteExperienceMaker(BaseExperienceMaker):
-    def __init__(self, *args, vllm_engines: List = None, packing_samples=False, **kwargs):
+    def __init__(self, *args, vllm_engines: List = None, packing_samples=False, log_dir=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.vllm_engines = vllm_engines
         self.packing_samples = packing_samples
-
+        self.rm_utils = RewardModelInputTool(self.tokenizer)
         if self.custom_reward_func:
             self.custom_reward_func = ray.remote(self.custom_reward_func)
+        if log_dir is not None:
+            self.log_file = open(os.path.join(log_dir, "sampled_output.jsonl"), "w", encoding="utf8")
+        else:
+            self.log_file = None
 
     @torch.no_grad()
     def make_experience_list(
-        self, all_prompts: Union[str, List[str]], all_labels, **generate_kwargs
+        self, all_prompts: Union[str, List[str]], all_labels, all_raw_prompts, **generate_kwargs
     ) -> List[Experience]:
         """
         Make a list of experience with the micro_rollout_batch_size.
@@ -248,7 +338,7 @@ class RemoteExperienceMaker(BaseExperienceMaker):
         torch.cuda.synchronize()
 
         # Make experiences (models forward: logprobs, values, rewards, and kl divergence)
-        experiences = self.make_experience(samples_list)
+        experiences = self.make_experience(samples_list, all_raw_prompts)
 
         # Process experiences (reward shaping, etc.)
         experiences = self.compute_advantages_and_returns(experiences, **generate_kwargs)
@@ -262,7 +352,7 @@ class RemoteExperienceMaker(BaseExperienceMaker):
         return experiences
 
     @torch.no_grad()
-    def make_experience(self, samples_list: List[Samples]) -> List[Experience]:
+    def make_experience(self, samples_list: List[Samples], raw_prompts_list: List[str]) -> List[Experience]:
         """
         Turn samples into experience by calculating logprobs, values, rewards, and kl divergence.
         """
@@ -282,7 +372,7 @@ class RemoteExperienceMaker(BaseExperienceMaker):
         num_actions_list = [s.num_actions for s in samples_list]
         packed_seq_lens_list = [s.packed_seq_lens for s in samples_list]
         prompts_list = [p for s in samples_list for p in s.prompts]
-        labels_list = [l for s in samples_list for l in s.labels]
+        labels_list = [la for s in samples_list for la in s.labels]
 
         # Move data to CPU for remote processing
         sequences_cpu_list = [seq.to("cpu") for seq in sequences_list]
@@ -335,15 +425,15 @@ class RemoteExperienceMaker(BaseExperienceMaker):
                 queries_list = []
                 for i, (seq, packed_lens) in enumerate(zip(sequences_cpu_list, packed_seq_lens_list)):
                     if not self.packing_samples:
-                        queries = self.tokenizer.batch_decode(seq, skip_special_tokens=False)
+                        queries = self.tokenizer.batch_decode([s[:-1] for s in seq], skip_special_tokens=False)
                     else:
                         sequences_list = []
                         offset = 0
                         tokens_list = seq.tolist()[0]
                         for length in packed_lens:
-                            sequences_list.append(tokens_list[offset : offset + length])
+                            sequences_list.append(tokens_list[offset: offset + length])
                             offset += length
-                        queries = self.tokenizer.batch_decode(sequences_list, skip_special_tokens=False)
+                        queries = self.tokenizer.batch_decode([s[:-1] for s in sequences_list], skip_special_tokens=False)
                     queries_list.extend(queries)
 
                 if self.custom_reward_func:
@@ -351,7 +441,31 @@ class RemoteExperienceMaker(BaseExperienceMaker):
                 else:
                     rank = torch.distributed.get_rank() // self.strategy.ring_attn_size
                     rm = self.remote_rm_url[rank % len(self.remote_rm_url)]
-                    r = remote_rm_fn_ray.remote(rm, queries=queries_list, prompts=prompts_list, labels=labels_list)
+                    rm_inputs = []
+                    for q, p, l, rp in zip(queries_list, prompts_list, labels_list, raw_prompts_list):
+                        response = q[len(p):]
+                        rm_input = self.rm_utils.construct_rm_input_str(
+                            p1=rp,
+                            p2=rp,
+                            r1=l,
+                            r2=response,
+                            wrapper="sft",
+                        )
+                        rm_inputs.append(rm_input)
+                        if self.log_file is not None:
+                            self.log_file.write(
+                                json.dumps(
+                                    {
+                                        "response": response,
+                                        "reference": l,
+                                        "prompt": p,
+                                        "rm_input": rm_input,
+                                    },
+                                    ensure_ascii=False,
+                                )
+                                + "\n"
+                            )
+                    r = remote_rm_fn_ray.remote(rm, queries=rm_inputs)
                 r_refs.append(r)
             else:
                 r_refs.append(ray.put([None] * len(samples_list)))
@@ -711,8 +825,8 @@ class RemoteExperienceMaker(BaseExperienceMaker):
         all_labels = sum([[label] * args.n_samples_per_prompt for label in all_labels], [])
         samples_list = []
         for i in range(0, len(all_prompts), args.micro_rollout_batch_size):
-            prompts = all_prompts[i : i + args.micro_rollout_batch_size]
-            labels = all_labels[i : i + args.micro_rollout_batch_size]
+            prompts = all_prompts[i: i + args.micro_rollout_batch_size]
+            labels = all_labels[i: i + args.micro_rollout_batch_size]
             inputs = self.tokenize_fn(prompts, self.prompt_max_len, device="cuda")
             sequences, attention_mask, action_mask = self.actor.generate(**inputs, **generate_kwargs)
             samples = Samples(
@@ -764,7 +878,7 @@ class RemoteExperienceMaker(BaseExperienceMaker):
         refs = []
         batch_size = (len(all_prompt_token_ids) + len(llms) - 1) // len(llms)
         for i, llm in enumerate(llms):
-            prompt_token_ids = all_prompt_token_ids[i * batch_size : (i + 1) * batch_size]
+            prompt_token_ids = all_prompt_token_ids[i * batch_size: (i + 1) * batch_size]
             refs.append(
                 llm.add_requests.remote(rank, sampling_params=sampling_params, prompt_token_ids=prompt_token_ids)
             )
@@ -791,9 +905,9 @@ class RemoteExperienceMaker(BaseExperienceMaker):
 
         samples_list = []
         for i in range(0, len(all_outputs), args.micro_rollout_batch_size):
-            outputs = all_outputs[i : i + self.strategy.args.micro_rollout_batch_size]
-            prompts = all_prompts[i : i + self.strategy.args.micro_rollout_batch_size]
-            labels = all_labels[i : i + self.strategy.args.micro_rollout_batch_size]
+            outputs = all_outputs[i: i + self.strategy.args.micro_rollout_batch_size]
+            prompts = all_prompts[i: i + self.strategy.args.micro_rollout_batch_size]
+            labels = all_labels[i: i + self.strategy.args.micro_rollout_batch_size]
             if not self.packing_samples:
                 # NOTE: concat all outputs to following format:
                 #

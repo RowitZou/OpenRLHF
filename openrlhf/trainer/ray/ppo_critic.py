@@ -176,9 +176,10 @@ class CriticModelRayActor(BasePPORole):
         critic_scheduler = get_scheduler(
             "cosine_with_min_lr",
             critic_optim,
-            num_warmup_steps=math.ceil(max_steps * args.lr_warmup_ratio),
+            num_warmup_steps=0,
             num_training_steps=max_steps,
-            scheduler_specific_kwargs={"min_lr": args.critic_learning_rate * 0.1},
+            scheduler_specific_kwargs={"min_lr": args.critic_learning_rate * 0.1
+                                       if args.critic_min_learning_rate == -1 else args.critic_min_learning_rate}
         )
 
         if args.gradient_checkpointing:
