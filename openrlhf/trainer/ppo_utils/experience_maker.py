@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import time
 from abc import ABC
@@ -45,7 +46,7 @@ class RewardModelInputTool():
         self.max_response_length = max_response_length
         self.response_cut_side = response_cut_side
 
-    def construct_rm_input_str(self, p1, p2, r1, r2, wrapper="sft") -> str:
+    def construct_rm_input_str(self, p1, p2, r1, r2, wrapper="sft", think=False, think_start="<think>", think_end="</think>") -> str:
 
         """
         Construct the input string for the reward model.
@@ -63,6 +64,21 @@ class RewardModelInputTool():
         p2 = "\n".join([e["content"] for e in p2]) if isinstance(p2, list) else p2
         r1 = "\n".join([e["content"] for e in r1]) if isinstance(r1, list) else r1
         r2 = "\n".join([e["content"] for e in r2]) if isinstance(r2, list) else r2
+
+        if think:
+            # 保证r2中有且仅有一个think_start和think_end
+            if r2.count(think_start) != 1 or r2.count(think_end) != 1:
+                return None
+            # 保证think_start在开始的位置。
+            if r2.index(think_start) != 0:
+                return None
+            # think_start和think_end之间不为空。
+            r2 = r2.replace(think_start, "")
+            r2_split = r2.split(think_end)
+            if len(r2_split[0]) == 0:
+                return None
+            # 把 r2 的 think_start 和 think_end 以及中间的内容全部去掉
+            r2 = r2_split[1]
 
         p1_ids = self.tokenizer.encode(p1, add_special_tokens=True)
         p2_ids = self.tokenizer.encode(p2, add_special_tokens=True)
@@ -444,13 +460,19 @@ class RemoteExperienceMaker(BaseExperienceMaker):
                     rm_inputs = []
                     for q, p, l, rp in zip(queries_list, prompts_list, labels_list, raw_prompts_list):
                         response = q[len(p):]
-                        rm_input = self.rm_utils.construct_rm_input_str(
-                            p1=rp,
-                            p2=rp,
-                            r1=l,
-                            r2=response,
-                            wrapper="sft",
-                        )
+                        if args.ref_mode:
+                            rm_input = self.rm_utils.construct_rm_input_str(
+                                p1=rp,
+                                p2=rp,
+                                r1=l,
+                                r2=response,
+                                wrapper="sft",
+                                think=args.r1,
+                                think_start=args.think_start,
+                                think_end=args.think_end,
+                            )
+                        else:
+                            rm_input = q
                         rm_inputs.append(rm_input)
                         if self.log_file is not None:
                             self.log_file.write(
@@ -465,7 +487,7 @@ class RemoteExperienceMaker(BaseExperienceMaker):
                                 )
                                 + "\n"
                             )
-                    r = remote_rm_fn_ray.remote(rm, queries=rm_inputs)
+                    r = remote_rm_fn_ray.remote(rm, queries=rm_inputs, think=args.r1, format_reward_pos=args.format_pos_r, format_reward_neg=args.format_neg_r)
                 r_refs.append(r)
             else:
                 r_refs.append(ray.put([None] * len(samples_list)))

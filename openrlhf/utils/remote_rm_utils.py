@@ -34,20 +34,32 @@ def request_reward(text: List[str], host: str, rm: str, retry_delay=0.2, max_ret
     return None
 
 
-def remote_rm_fn(api_url, queries, score_key="rewards", mean=0.0, std=10.0):
+def remote_rm_fn(api_url, queries, score_key="rewards", think=False, format_pos=None, format_neg=None, mean=0.0, std=10.0):
     """remote reward model API
     api_url: RM API, We assume that the API supports two modes: merging query + response and not merging
     queries: query+response with the template
     design is made optional.
     score_key: RM score key
     """
-
-    scores = request_reward(queries, api_url, rm=score_key)
+    if think:
+        assert format_pos is not None and format_neg is not None
+        normal_queries = [q for q in queries if q is not None]
+        normal_scores = request_reward(normal_queries, api_url, rm=score_key)[::-1]
+        scores = []
+        for q in queries:
+            if q is None:
+                scores.append(format_neg)
+            else:
+                normal_score = normal_scores.pop()
+                scores.append(normal_score + format_pos)
+        assert len(normal_scores) == 0
+    else:
+        scores = request_reward(queries, api_url, rm=score_key)
     scores = torch.tensor(scores)
     scores = (scores - mean) / std
     return scores
 
 
 @ray.remote
-def remote_rm_fn_ray(api_url, queries, score_key="rewards"):
-    return remote_rm_fn(api_url, queries, score_key)
+def remote_rm_fn_ray(api_url, queries, score_key="rewards", think=False, format_reward_pos=None, format_reward_neg=None):
+    return remote_rm_fn(api_url, queries, score_key, think, format_reward_pos, format_reward_neg)

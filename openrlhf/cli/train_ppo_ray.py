@@ -192,6 +192,17 @@ def train(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+
+    # ref
+    parser.add_argument("--ref_mode", action="store_true", default=True, help="training ppo using ref-mode.")
+
+    # r1
+    parser.add_argument("--r1", action="store_true", default=False, help="training ppo using r1-based policy")
+    parser.add_argument("--format_pos_r", type=float, default=0.0, help="if format is right, giving the format reward")
+    parser.add_argument("--format_neg_r", type=float, default=-20.0, help="if format is wrong, the total reward is format_neg_r")
+    parser.add_argument("--think_start", type=str, default="## Think", help="the start token of the think phase")
+    parser.add_argument("--think_end", type=str, default="## Answer\n", help="the end token of the think phase")
+
     # Ray and vLLM
     parser.add_argument("--ref_num_nodes", type=int, default=1, help="number of nodes for reference")
     parser.add_argument("--ref_num_gpus_per_node", type=int, default=8, help="number of gpus per node for reference")
