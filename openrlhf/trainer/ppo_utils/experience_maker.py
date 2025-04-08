@@ -441,7 +441,10 @@ class RemoteExperienceMaker(BaseExperienceMaker):
                 queries_list = []
                 for i, (seq, packed_lens) in enumerate(zip(sequences_cpu_list, packed_seq_lens_list)):
                     if not self.packing_samples:
-                        queries = self.tokenizer.batch_decode([s[:-1] for s in seq], skip_special_tokens=False)
+                        if args.ref_mode:
+                            queries = self.tokenizer.batch_decode([s[:-1] for s in seq], skip_special_tokens=False)
+                        else:
+                            queries = self.tokenizer.batch_decode(seq, skip_special_tokens=False)
                     else:
                         sequences_list = []
                         offset = 0
@@ -449,7 +452,10 @@ class RemoteExperienceMaker(BaseExperienceMaker):
                         for length in packed_lens:
                             sequences_list.append(tokens_list[offset: offset + length])
                             offset += length
-                        queries = self.tokenizer.batch_decode([s[:-1] for s in sequences_list], skip_special_tokens=False)
+                        if args.ref_mode:
+                            queries = self.tokenizer.batch_decode([s[:-1] for s in sequences_list], skip_special_tokens=False)
+                        else:
+                            queries = self.tokenizer.batch_decode(sequences_list, skip_special_tokens=False)
                     queries_list.extend(queries)
 
                 if self.custom_reward_func:
@@ -472,6 +478,18 @@ class RemoteExperienceMaker(BaseExperienceMaker):
                                 think_end=args.think_end,
                             )
                         else:
+                            if args.r1:
+                                # 保证 q 中有且仅有一个think_start和think_end
+                                if q.count(args.think_start) != 1 or q.count(args.think_end) != 1:
+                                    q = None
+                                else:
+                                    # think_start和think_end之间不为空。
+                                    cot = q.split(args.think_start)[1].split(args.think_end)[0]
+                                    if len(cot) == 0:
+                                        q = None
+                                    else:
+                                        # 把 q 的 think_start 和 think_end 以及中间的内容全部去掉
+                                        q = q.replace(args.think_start+cot+args.think_end, "")
                             rm_input = q
                         rm_inputs.append(rm_input)
                         if self.log_file is not None:
