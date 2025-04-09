@@ -2,19 +2,21 @@ train_batch_size=1024
 rollout_batch_size=1024
 data_type=HH-905K
 # policy_model_name=Qwen2.5-1.5B-Instruct
-policy_model_name=InternLM3-8B-Instruct-R1-Format
-rm_name=RM_SFT_reward_pt_1_8b_DATA_HH_88k_blank_patch_Node_2_LR_9e_6_STEP_658_hf
+policy_model_name=InternLM3-8B-Instruct-wo-RL
+rm_name=RM_Skyworks_Llama_31_8B
+# rm_name=RM_SFT_reward_pt_1_8b_DATA_HH_88k_blank_patch_Node_2_LR_9e_6_STEP_658_hf
 
-actor_pretrain_path=/cpfs01/shared/llm_ddd/zouyicheng/rm_pretrain/ckpts_val/s1K_1_1_deepseek-internlm3_dense8B_51_open_source_hf
+# actor_pretrain_path=/cpfs01/shared/llm_ddd/zouyicheng/rm_pretrain/ckpts_val/official_Kepler_dense_8B_20241225k_256k_enhance_256k_3_1_20500_FT_internlm3_32k_s1_finalrc11_256gpu_4073_s2_128k_internlm3_s2_final_rc19_20250108d_845_hf
 # actor_pretrain_path=/cpfs01/shared/public/geqiming/all_models/Qwen2.5-1.5B-Instruct
-# /cpfs01/shared/llm_ddd/liushichun1/models/internlm3-8b-instruct-wo-rl
-reward_pretrain_path=/cpfs01/shared/llm_ddd/zouyicheng/rm_pretrain/rm/RM_SFT_reward_pt_1_8b_DATA_HH_88k_blank_patch_Node_2_LR_9e_6_STEP_658_hf
-reward_remote_url=10.130.1.238:30000
-# reward_remote_url=10.130.1.238:30000
+actor_pretrain_path=/cpfs01/shared/llm_ddd/liushichun1/models/internlm3-8b-instruct-wo-rl
+reward_pretrain_path=/cpfs01/shared/llm_ddd/liushichun1/models/Skywork-Reward-Llama-3.1-8B
+# reward_pretrain_path=/cpfs01/shared/llm_ddd/zouyicheng/rm_pretrain/rm/RM_SFT_reward_pt_1_8b_DATA_HH_88k_blank_patch_Node_2_LR_9e_6_STEP_658_hf
+reward_remote_url=10.130.1.147:30000
+# reward_remote_url=10.130.1.175:30000
 prompt_data_path=/cpfs01/shared/llm_ddd/zouyicheng/rm_pretrain/data/ppo/internal/train
 total_sample_num=905361
 
-name="r1-ray-policy_${policy_model_name}-${rm_name}_data_${data_type}_bsz_${train_batch_size}_lr_5e-7_epoch_5"
+name="ppo-ray-policy_${policy_model_name}-${rm_name}_data_${data_type}_bsz_${train_batch_size}_lr_5e-7_epoch_5"
 
 save_steps=$(( (total_sample_num / rollout_batch_size) / 10 ))
 
@@ -44,36 +46,33 @@ if [ "$RANK" -eq 0 ]; then
     -- python -m openrlhf.cli.train_ppo_ray \
     --ref_num_nodes 0 \
     --ref_num_gpus_per_node 8 \
-    --critic_num_nodes 4 \
+    --critic_num_nodes 2 \
     --critic_num_gpus_per_node 8 \
-    --actor_num_nodes 4 \
+    --actor_num_nodes 2 \
     --actor_num_gpus_per_node 8 \
     --vllm_num_engines 32 \
     --vllm_tensor_parallel_size 1 \
     --vllm_sync_backend nccl \
+    --colocate_actor_ref \
     --pretrain $actor_pretrain_path \
     --remote_rm_url $reward_remote_url \
     --reward_pretrain $reward_pretrain_path \
     --save_path /cpfs01/shared/llm_ddd/yangyuming/OpenRLHF/ckpts/${name} \
     --ckpt_path /cpfs01/shared/llm_ddd/yangyuming/OpenRLHF/ckpts/${name} \
-    --micro_train_batch_size 1 \
+    --micro_train_batch_size 2 \
     --train_batch_size $train_batch_size \
     --micro_rollout_batch_size 32 \
     --rollout_batch_size $rollout_batch_size \
     --num_episodes 5 \
     --prompt_max_len 4096 \
     --generate_max_len 4096 \
-    --ring_attn_size 2 \
-    --ring_head_stride 1 \
     --save_steps $save_steps \
     --max_ckpt_num $save_steps \
     --save_hf_ckpt \
-    --zero_stage 3 \
+    --zero_stage 1 \
     --bf16 \
     --lambd 1 \
-    --r1 \
-    --format_pos_r 0.0 \
-    --format_neg_r -20.0 \
+    --ref_mode False \
     --actor_learning_rate 5e-7 \
     --critic_learning_rate 1e-5 \
     --actor_min_learning_rate 1e-7 \
@@ -84,12 +83,10 @@ if [ "$RANK" -eq 0 ]; then
     --prompt_data json@${prompt_data_path} \
     --input_key message_data \
     --label_key ref_message_data \
-    --ref_mode \
     --normalize_reward \
     --packing_samples \
     --overlap_comm \
     --flash_attn \
-    --adam_offload \
     --gradient_checkpointing \
     --apply_chat_template \
     --load_checkpoint \
