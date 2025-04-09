@@ -24,7 +24,7 @@ logger = init_logger(__name__)
 
 def decode_chat_string(encoded_str):
     pattern = r"<\|(user|assistant|system)\|>(.*?)(?=<\|(user|assistant|system)\|>|$)"
-    matches = re.findall(pattern, encoded_str)
+    matches = re.findall(pattern, encoded_str, re.DOTALL)
     decoded_chat = [{"role": match[0], "content": match[1]} for match in matches]
     return decoded_chat
 
