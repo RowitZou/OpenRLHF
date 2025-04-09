@@ -88,6 +88,7 @@ class ActorPPOTrainer(BasePPOTrainer):
             self.reward_model,
             self.initial_model,
             self.tokenizer,
+            self.rm_tokenizer,
             self.prompt_max_len,
             self.kl_ctl,
             self.strategy,
@@ -663,6 +664,10 @@ class ActorModelRayActor(BasePPORole):
             pretrain, actor.model, "left", strategy, use_fast=not strategy.args.disable_fast_tokenizer
         )
 
+        self.rm_tokenizer = get_tokenizer(
+            args.reward_pretrain, None, "right", strategy, use_fast=not strategy.args.disable_fast_tokenizer
+        )
+
         if args.enable_ema:
             ema_model = Actor(
                 pretrain,
@@ -829,6 +834,7 @@ class ActorModelRayActor(BasePPORole):
             gradient_checkpointing=args.gradient_checkpointing,
             critic_train_remote=critic_train_remote,
             tokenizer=self.tokenizer,
+            rm_tokenizer=self.rm_tokenizer,
             prompt_max_len=args.prompt_max_len,
             value_clip=args.value_clip,
             eps_clip=args.eps_clip,

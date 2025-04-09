@@ -8,7 +8,7 @@ def preprocess_data(data, input_template=None, input_key="input", label_key=None
         if isinstance(chat, str):
             chat = [{"role": "user", "content": chat}]
         prompt = apply_chat_template(chat, tokenize=False, add_generation_prompt=True)
-        prompt_raw = "\n".join([e["content"] for e in chat])
+        prompt_raw = "".join(["<|"+e["role"]+"|>"+e["content"] for e in chat])
     else:
         prompt = data[input_key]
         if input_template:

@@ -22,6 +22,13 @@ from openrlhf.utils.remote_rm_utils import remote_rm_fn_ray
 logger = init_logger(__name__)
 
 
+def decode_chat_string(encoded_str):
+    pattern = r"<\|(user|assistant|system)\|>(.*?)(?=<\|(user|assistant|system)\|>|$)"
+    matches = re.findall(pattern, encoded_str)
+    decoded_chat = [{"role": match[0], "content": match[1]} for match in matches]
+    return decoded_chat
+
+
 def to(tensor: Union[torch.Tensor, list[torch.Tensor]], device):
     if isinstance(tensor, list):
         return [to(t, device) for t in tensor]
@@ -45,6 +52,33 @@ class RewardModelInputTool():
         self.max_length = max_length - 4
         self.max_response_length = max_response_length
         self.response_cut_side = response_cut_side
+
+    def apply_chat_template(self, ddm, think=False, think_start="<think>", think_end="</think>") -> str:
+        """
+        Apply the chat template to the input and output sequences.
+        Args:
+            ddm: The input data with ddm format.
+        Returns:
+            The input string for the reward model.
+        """
+        if think:
+            response = ddm[-1]["content"]
+            # 保证response中有且仅有一个think_start和think_end
+            if response.count(think_start) != 1 or response.count(think_end) != 1:
+                return None
+            # 保证think_start在开始的位置。
+            if response.index(think_start) != 0:
+                return None
+            # think_start和think_end之间不为空。
+            response = response.replace(think_start, "")
+            response_split = response.split(think_end)
+            if len(response_split[0]) == 0:
+                return None
+            # 把 r2 的 think_start 和 think_end 以及中间的内容全部去掉
+            response = response_split[1]
+            ddm[-1]["content"] = response
+
+        return self.tokenizer.apply_chat_template(ddm, tokenize=False)
 
     def construct_rm_input_str(self, p1, p2, r1, r2, wrapper="sft", think=False, think_start="<think>", think_end="</think>") -> str:
 
@@ -239,6 +273,7 @@ class BaseExperienceMaker(ABC):
         reward_model: nn.Module,
         initial_model: Actor,
         tokenizer,
+        rm_tokenizer,
         prompt_max_len: int,
         kl_controller,
         strategy=None,
@@ -252,6 +287,7 @@ class BaseExperienceMaker(ABC):
         self.remote_rm_url = remote_rm_url
         self.initial_model = initial_model
         self.tokenizer = tokenizer
+        self.rm_tokenizer = rm_tokenizer
         self.prompt_max_len = prompt_max_len
         self.kl_ctl = kl_controller
         self.strategy = strategy
@@ -298,7 +334,7 @@ class RemoteExperienceMaker(BaseExperienceMaker):
         super().__init__(*args, **kwargs)
         self.vllm_engines = vllm_engines
         self.packing_samples = packing_samples
-        self.rm_utils = RewardModelInputTool(self.tokenizer)
+        self.rm_utils = RewardModelInputTool(self.rm_tokenizer)
         if self.custom_reward_func:
             self.custom_reward_func = ray.remote(self.custom_reward_func)
         if log_dir is not None:
@@ -441,10 +477,7 @@ class RemoteExperienceMaker(BaseExperienceMaker):
                 queries_list = []
                 for i, (seq, packed_lens) in enumerate(zip(sequences_cpu_list, packed_seq_lens_list)):
                     if not self.packing_samples:
-                        if args.ref_mode:
-                            queries = self.tokenizer.batch_decode([s[:-1] for s in seq], skip_special_tokens=False)
-                        else:
-                            queries = self.tokenizer.batch_decode(seq, skip_special_tokens=False)
+                        queries = self.tokenizer.batch_decode([s[:-1] for s in seq], skip_special_tokens=False)
                     else:
                         sequences_list = []
                         offset = 0
@@ -452,10 +485,7 @@ class RemoteExperienceMaker(BaseExperienceMaker):
                         for length in packed_lens:
                             sequences_list.append(tokens_list[offset: offset + length])
                             offset += length
-                        if args.ref_mode:
-                            queries = self.tokenizer.batch_decode([s[:-1] for s in sequences_list], skip_special_tokens=False)
-                        else:
-                            queries = self.tokenizer.batch_decode(sequences_list, skip_special_tokens=False)
+                        queries = self.tokenizer.batch_decode([s[:-1] for s in sequences_list], skip_special_tokens=False)
                     queries_list.extend(queries)
 
                 if self.custom_reward_func:
@@ -466,6 +496,7 @@ class RemoteExperienceMaker(BaseExperienceMaker):
                     rm_inputs = []
                     for q, p, l, rp in zip(queries_list, prompts_list, labels_list, raw_prompts_list):
                         response = q[len(p):]
+                        rp = decode_chat_string(rp)
                         if args.ref_mode:
                             rm_input = self.rm_utils.construct_rm_input_str(
                                 p1=rp,
@@ -478,19 +509,9 @@ class RemoteExperienceMaker(BaseExperienceMaker):
                                 think_end=args.think_end,
                             )
                         else:
-                            if args.r1:
-                                # 保证 q 中有且仅有一个think_start和think_end
-                                if q.count(args.think_start) != 1 or q.count(args.think_end) != 1:
-                                    q = None
-                                else:
-                                    # think_start和think_end之间不为空。
-                                    cot = q.split(args.think_start)[1].split(args.think_end)[0]
-                                    if len(cot) == 0:
-                                        q = None
-                                    else:
-                                        # 把 q 的 think_start 和 think_end 以及中间的内容全部去掉
-                                        q = q.replace(args.think_start+cot+args.think_end, "")
-                            rm_input = q
+                            rm_input = self.rm_utils.apply_chat_template(
+                                rp + [{"role": "assistant", "content": response}]
+                            )
                         rm_inputs.append(rm_input)
                         if self.log_file is not None:
                             self.log_file.write(

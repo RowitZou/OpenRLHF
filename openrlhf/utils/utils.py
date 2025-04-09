@@ -4,7 +4,7 @@ from datasets import interleave_datasets, load_dataset, load_from_disk
 from transformers import AutoTokenizer
 
 
-def get_tokenizer(pretrain, model, padding_side="left", strategy=None, use_fast=True):
+def get_tokenizer(pretrain, model=None, padding_side="left", strategy=None, use_fast=True):
     tokenizer = AutoTokenizer.from_pretrained(pretrain, trust_remote_code=True, use_fast=use_fast)
     tokenizer.padding_side = padding_side
     tokenizer.truncation_side = padding_side
@@ -13,7 +13,8 @@ def get_tokenizer(pretrain, model, padding_side="left", strategy=None, use_fast=
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
         tokenizer.pad_token_id = tokenizer.eos_token_id
-        model.config.pad_token_id = tokenizer.pad_token_id
+        if model is not None:
+            model.config.pad_token_id = tokenizer.pad_token_id
 
     return tokenizer
 

@@ -76,6 +76,7 @@ class BasePPOTrainer(ABC):
         max_epochs: int = 1,
         max_norm: float = 1.0,
         tokenizer: Optional[Callable[[Any], dict]] = None,
+        rm_tokenizer: Optional[Callable[[Any], dict]] = None,
         prompt_max_len: int = 128,
         dataloader_pin_memory: bool = True,
         remote_rm_url: str = None,
@@ -96,6 +97,7 @@ class BasePPOTrainer(ABC):
         self.micro_rollout_batch_size = micro_rollout_batch_size
         self.max_epochs = max_epochs
         self.tokenizer = tokenizer
+        self.rm_tokenizer = rm_tokenizer
         self.generate_kwargs = generate_kwargs
         self.dataloader_pin_memory = dataloader_pin_memory
         self.max_norm = max_norm
