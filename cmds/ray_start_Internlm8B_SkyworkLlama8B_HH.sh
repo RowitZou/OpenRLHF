@@ -34,10 +34,11 @@ if [ "$RANK" -eq 0 ]; then
     echo "Starting head node (RANK=${RANK}) on port $MASTER_PORT..."
     
     MASTER_ADDR=${MASTER_ADDR}
+    mkdir -p "$(dirname "$TARGET_FILE")"
     echo "$MASTER_ADDR" > "$TARGET_FILE"
 
     ray start --head --num-gpus 8 --block &
-    sleep 60
+    sleep 120
     
     echo "Executing main program on head node..."
     # TODO:     # --colocate_critic_reward \
@@ -72,7 +73,6 @@ if [ "$RANK" -eq 0 ]; then
     --zero_stage 1 \
     --bf16 \
     --lambd 1 \
-    --ref_mode False \
     --actor_learning_rate 5e-7 \
     --critic_learning_rate 1e-5 \
     --actor_min_learning_rate 1e-7 \
@@ -93,7 +93,7 @@ if [ "$RANK" -eq 0 ]; then
     --use_tensorboard /cpfs01/shared/llm_ddd/yangyuming/OpenRLHF/logs/${name}
     
 else 
-    sleep 30
+    sleep 120
     MASTER_ADDR=$(cat "$TARGET_FILE")
 
     echo "Starting worker node (RANK=${RANK}), connecting to ${MASTER_ADDR}:${MASTER_PORT}..."
