@@ -83,6 +83,7 @@ if [ "$RANK" -eq 0 ]; then
     --prompt_data json@${prompt_data_path} \
     --input_key message_data \
     --label_key ref_message_data \
+    --ref_mode \
     --normalize_reward \
     --packing_samples \
     --overlap_comm \

@@ -61,5 +61,5 @@ def remote_rm_fn(api_url, queries, score_key="rewards", think=False, format_pos=
 
 
 @ray.remote
-def remote_rm_fn_ray(api_url, queries, score_key="rewards", think=False, format_reward_pos=None, format_reward_neg=None):
-    return remote_rm_fn(api_url, queries, score_key, think, format_reward_pos, format_reward_neg)
+def remote_rm_fn_ray(api_url, queries, score_key="rewards", think=False, format_reward_pos=None, format_reward_neg=None, mean=0.0, std=10.0):
+    return remote_rm_fn(api_url, queries, score_key, think, format_reward_pos, format_reward_neg, mean, std)

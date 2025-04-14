@@ -14,7 +14,7 @@ reward_remote_url=10.130.1.175:30000
 prompt_data_path=/cpfs01/shared/llm_ddd/zouyicheng/rm_pretrain/data/ppo/puyu-rl/train
 total_sample_num=172828
 
-name="ppo-ray-policy_${policy_model_name}-${rm_name}_data_${data_type}_bsz_${train_batch_size}_lr_5e-7_epoch_10"
+name="ppo-ray-policy_${policy_model_name}-${rm_name}_data_${data_type}_bsz_${train_batch_size}_debug"
 
 save_steps=$(( (total_sample_num / rollout_batch_size) / 10 ))
 
@@ -80,6 +80,7 @@ if [ "$RANK" -eq 0 ]; then
     --prompt_data json@${prompt_data_path} \
     --input_key message_data \
     --label_key ref_message_data \
+    --ref_mode \
     --normalize_reward \
     --packing_samples \
     --overlap_comm \

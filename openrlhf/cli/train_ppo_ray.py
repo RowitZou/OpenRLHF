@@ -194,7 +194,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     # ref
-    parser.add_argument("--ref_mode", action="store_true", default=True, help="training ppo using ref-mode.")
+    parser.add_argument("--ref_mode", action="store_true", default=False, help="training ppo using ref-mode.")
+
+    # reward model mean/std
+    parser.add_argument("--reward_mean", type=float, default=0.0, help="mean of reward model")
+    parser.add_argument("--reward_std", type=float, default=10.0, help="std of reward model")
 
     # r1
     parser.add_argument("--r1", action="store_true", default=False, help="training ppo using r1-based policy")

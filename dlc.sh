@@ -10,7 +10,7 @@ export HOME="/cpfs01/shared/llm_ddd/zouyicheng/"
 
 
 function commit {
-    num_nodes=12
+    num_nodes=4
     name="ppo-ray-policy_${policy_model_name}-${rm_name}_data_${data_type}_bsz_${train_batch_size}"
     num_tasks_per_node=1
     node_cpus=96
@@ -19,7 +19,7 @@ function commit {
 
 
     cmd="sudo su && . /cpfs01/shared/llm_ddd/zouyicheng/.bashrc && cd /cpfs01/shared/llm_ddd/zouyicheng/OpenRLHF && conda activate rlhf && \
-bash /cpfs01/shared/llm_ddd/zouyicheng/OpenRLHF/cmds/ray_start_Internlm8B_RM1.8B_HH_R1.sh"
+bash /cpfs01/shared/llm_ddd/zouyicheng/OpenRLHF/cmds/final_ray_start_Internlm8B_RM1.8B_HH_DATA_HH.sh"
 
     /cpfs01/shared/public/dlc create job --config /cpfs01/shared/llm_ddd/zouyicheng/dlc.config \
     --name $name \
@@ -40,7 +40,7 @@ train_batch_size=1024
 data_type=HH-905K
 # data_type=Bench-172K
 # policy_model_name=Qwen2.5-7B-Instruct
-policy_model_name=InternLM3-8B-Instruct-R1-Format
-rm_name=RM_SFT_reward_pt_1_8b_DATA_HH_88k_blank_patch_Node_2_LR_9e_6_STEP_658_hf
+policy_model_name=InternLM8B
+rm_name=final_RM1.8B_HH
 
 commit 

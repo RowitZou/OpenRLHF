@@ -526,7 +526,9 @@ class RemoteExperienceMaker(BaseExperienceMaker):
                                 )
                                 + "\n"
                             )
-                    r = remote_rm_fn_ray.remote(rm, queries=rm_inputs, think=args.r1, format_reward_pos=args.format_pos_r, format_reward_neg=args.format_neg_r)
+                    r = remote_rm_fn_ray.remote(rm, queries=rm_inputs,
+                                                think=args.r1, format_reward_pos=args.format_pos_r, format_reward_neg=args.format_neg_r,
+                                                mean=args.reward_mean, std=args.reward_std)
                 r_refs.append(r)
             else:
                 r_refs.append(ray.put([None] * len(samples_list)))
