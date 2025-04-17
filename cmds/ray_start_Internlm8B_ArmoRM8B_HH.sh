@@ -3,13 +3,13 @@ rollout_batch_size=1024
 data_type=HH-905K
 # policy_model_name=Qwen2.5-1.5B-Instruct
 policy_model_name=InternLM3-8B-Instruct-wo-RL
-rm_name=RM_Skyworks_Llama_31_8B
+rm_name=RM_ArmoRM_Llama_3_8B
 # rm_name=RM_SFT_reward_pt_1_8b_DATA_HH_88k_blank_patch_Node_2_LR_9e_6_STEP_658_hf
 
 # actor_pretrain_path=/cpfs01/shared/llm_ddd/zouyicheng/rm_pretrain/ckpts_val/official_Kepler_dense_8B_20241225k_256k_enhance_256k_3_1_20500_FT_internlm3_32k_s1_finalrc11_256gpu_4073_s2_128k_internlm3_s2_final_rc19_20250108d_845_hf
 # actor_pretrain_path=/cpfs01/shared/public/geqiming/all_models/Qwen2.5-1.5B-Instruct
 actor_pretrain_path=/cpfs01/shared/llm_ddd/liushichun1/models/internlm3-8b-instruct-wo-rl
-reward_pretrain_path=/cpfs01/shared/llm_ddd/liushichun1/models/Skywork-Reward-Llama-3.1-8B
+reward_pretrain_path=/cpfs01/shared/llm_ddd/liushichun1/models/ArmoRM-Llama3-8B-v0.1
 # reward_pretrain_path=/cpfs01/shared/llm_ddd/zouyicheng/rm_pretrain/rm/RM_SFT_reward_pt_1_8b_DATA_HH_88k_blank_patch_Node_2_LR_9e_6_STEP_658_hf
 reward_remote_url=10.130.1.147:30000
 # reward_remote_url=10.130.1.175:30000
@@ -27,8 +27,7 @@ MASTER_PORT=6379
 MASTER_ADDR=${MASTER_ADDR}
 echo "MASTER_ADDR: $MASTER_ADDR"
 
-# 883 step (HH bs 1024, other bs 512) 1 epoch
-# lr 5e-7 linear
+
 
 echo "Rank $RANK is running on $MASTER_ADDR"
 if [ "$RANK" -eq 0 ]; then 
@@ -65,7 +64,7 @@ if [ "$RANK" -eq 0 ]; then
     --train_batch_size $train_batch_size \
     --micro_rollout_batch_size 32 \
     --rollout_batch_size $rollout_batch_size \
-    --num_episodes 1 \
+    --num_episodes 5 \
     --prompt_max_len 4096 \
     --generate_max_len 4096 \
     --save_steps $save_steps \
@@ -76,7 +75,7 @@ if [ "$RANK" -eq 0 ]; then
     --lambd 1 \
     --actor_learning_rate 5e-7 \
     --critic_learning_rate 1e-5 \
-    --actor_min_learning_rate 5e-7 \
+    --actor_min_learning_rate 1e-7 \
     --critic_min_learning_rate 1e-6 \
     --lr_warmup_ratio 0.005 \
     --critic_pretrain $actor_pretrain_path \
