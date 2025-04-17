@@ -1,8 +1,8 @@
-train_batch_size=1024
-rollout_batch_size=1024
+train_batch_size=128
+rollout_batch_size=128
 lr=5e-7
-epoch=5
-data_type=HH-905K
+epoch=4
+data_type=Bench-347K
 # policy_model_name=Qwen2.5-1.5B-Instruct
 policy_model_name=InternLM3-8B-Instruct-wo-RL
 rm_name=RM_SFT_reward_pt_1_8b_final_DATA_puyu_standard_Node_2_LR_1e-5_STEP_247_hf
@@ -12,12 +12,12 @@ actor_pretrain_path=/cpfs01/shared/llm_ddd/zouyicheng/rm_pretrain/ckpts_val/offi
 # /cpfs01/shared/llm_ddd/liushichun1/models/internlm3-8b-instruct-wo-rl
 reward_pretrain_path=/cpfs01/shared/llm_ddd/zouyicheng/rm_pretrain/rm/RM_SFT_reward_pt_1_8b_final_DATA_puyu_standard_Node_2_LR_1e-5_STEP_247_hf
 reward_remote_url=10.130.1.238:30000
-prompt_data_path=/cpfs01/shared/llm_ddd/zouyicheng/rm_pretrain/data/ppo/internal/train
-total_sample_num=905361
+prompt_data_path=/cpfs01/shared/llm_ddd/zouyicheng/rm_pretrain/data/ppo/puyu-rl/train_plus
+total_sample_num=347068
 
 name="final-ppo-ray-policy_${policy_model_name}-${rm_name}_data_${data_type}_bsz_${train_batch_size}_lr_${lr}_epoch_${epoch}"
 
-save_steps=$(( (total_sample_num / rollout_batch_size) / 10 ))
+save_steps=$(( (total_sample_num / rollout_batch_size) / 8 ))
 
 cd /cpfs01/shared/llm_ddd/zouyicheng/OpenRLHF
 TARGET_FILE="/cpfs01/shared/llm_ddd/zouyicheng/OpenRLHF/addr/addr_${name}.txt"
@@ -73,16 +73,16 @@ if [ "$RANK" -eq 0 ]; then
     --lambd 1 \
     --actor_learning_rate $lr \
     --critic_learning_rate 1e-5 \
-    --actor_min_learning_rate 1e-7 \
+    --actor_min_learning_rate $lr \
     --critic_min_learning_rate 1e-6 \
-    --lr_warmup_ratio 0.005 \
+    --lr_warmup_ratio 0.002 \
     --critic_pretrain $actor_pretrain_path \
     --init_kl_coef 0 \
     --prompt_data json@${prompt_data_path} \
     --input_key message_data \
     --label_key ref_message_data \
     --ref_mode \
-    --reward_mean 0.0 \
+    --reward_mean -10.0 \
     --reward_std 10.0 \
     --normalize_reward \
     --packing_samples \

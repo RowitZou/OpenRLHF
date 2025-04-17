@@ -2,18 +2,18 @@ train_batch_size=1024
 rollout_batch_size=1024
 lr=5e-7
 epoch=5
-data_type=HH-905K
+data_type=Bench-347K
 # policy_model_name=Qwen2.5-1.5B-Instruct
 policy_model_name=InternLM3-8B-Instruct-wo-RL
-rm_name=RM_SFT_reward_pt_1_8b_final_DATA_puyu_standard_Node_2_LR_1e-5_STEP_247_hf
+rm_name=RM_SFT_reward_pt_1_8b_final_DATA_HH_88k_blank_patch_Node_2_LR_1e-5_STEP_659_hf
 
 actor_pretrain_path=/cpfs01/shared/llm_ddd/zouyicheng/rm_pretrain/ckpts_val/official_Kepler_dense_8B_20241225k_256k_enhance_256k_3_1_20500_FT_internlm3_32k_s1_finalrc11_256gpu_4073_s2_128k_internlm3_s2_final_rc19_20250108d_845_hf
 # actor_pretrain_path=/cpfs01/shared/public/geqiming/all_models/Qwen2.5-1.5B-Instruct
 # /cpfs01/shared/llm_ddd/liushichun1/models/internlm3-8b-instruct-wo-rl
-reward_pretrain_path=/cpfs01/shared/llm_ddd/zouyicheng/rm_pretrain/rm/RM_SFT_reward_pt_1_8b_final_DATA_puyu_standard_Node_2_LR_1e-5_STEP_247_hf
-reward_remote_url=10.130.1.238:30000
-prompt_data_path=/cpfs01/shared/llm_ddd/zouyicheng/rm_pretrain/data/ppo/internal/train
-total_sample_num=905361
+reward_pretrain_path=/cpfs01/shared/llm_ddd/zouyicheng/rm_pretrain/rm/RM_SFT_reward_pt_1_8b_final_DATA_HH_88k_blank_patch_Node_2_LR_1e-5_STEP_659_hf
+reward_remote_url=10.130.0.191:30000
+prompt_data_path=/cpfs01/shared/llm_ddd/zouyicheng/rm_pretrain/data/ppo/puyu-rl/train_plus
+total_sample_num=347068
 
 name="final-ppo-ray-policy_${policy_model_name}-${rm_name}_data_${data_type}_bsz_${train_batch_size}_lr_${lr}_epoch_${epoch}"
 
@@ -82,7 +82,7 @@ if [ "$RANK" -eq 0 ]; then
     --input_key message_data \
     --label_key ref_message_data \
     --ref_mode \
-    --reward_mean 0.0 \
+    --reward_mean -14.0 \
     --reward_std 10.0 \
     --normalize_reward \
     --packing_samples \

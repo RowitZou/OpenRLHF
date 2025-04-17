@@ -326,6 +326,7 @@ class ActorPPOTrainer(BasePPOTrainer):
                 if "policy_loss" in status:
                     short_status = {
                         "pg": status["policy_loss"],
+                        "ent": status["entropy"],
                         "rm": status["reward"],
                         "ret": status["return"],
                         "glen": status["response_length"],
@@ -416,6 +417,22 @@ class ActorPPOTrainer(BasePPOTrainer):
             action_mask=experience.action_mask,
         )
 
+        # entropy
+        action_probs = torch.exp(action_log_probs)  # 通过对数概率计算概率
+
+        # 计算 entropy
+        entropy = -(action_probs * action_log_probs)  # sum across actions
+
+        # 根据经验的 mask 来平均 entropy
+        if not self.args.packing_samples:
+            policy_entropy = masked_mean(entropy, experience.action_mask, dim=-1).mean()
+        else:
+            entropy_unpacked = unpacking_samples(entropy, num_actions)
+            policy_entropy = torch.tensor(
+                [each_entropy.mean() for each_entropy in entropy_unpacked],
+                device=action_log_probs.device
+            ).mean()
+
         if self.args.use_kl_loss:
             if self.initial_model is not None:
                 kl = compute_approx_kl(
@@ -478,7 +495,7 @@ class ActorPPOTrainer(BasePPOTrainer):
             self.strategy.moving_average(self.actor, self.ema_model, self.ema_beta, "cuda")
 
         # status
-        status = {"policy_loss": actor_loss.item(), "actor_lr": self.actor_scheduler.get_last_lr()[0]}
+        status = {"policy_loss": actor_loss.item(), "actor_lr": self.actor_scheduler.get_last_lr()[0], "entropy": policy_entropy.item()}
         if self.pretrain_dataloader is not None:
             status["ptx_loss"] = ptx_loss.item()
         for k, v in experience.info.items():
