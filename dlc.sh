@@ -6,11 +6,8 @@
 # doushihan data source data1dfp0cngxv41
 # liushichun1 data source data1ubhj4714msc
 # yangyuming data source data4n4f7sfaxa5g
-# yangyuming data source data4n4f7sfaxa5g
 
 export HOME="/cpfs01/shared/llm_ddd/yangyuming/"
-export HOME="/cpfs01/shared/llm_ddd/yangyuming/"
-
 
 function commit {
     num_nodes=8
@@ -25,7 +22,6 @@ function commit {
 bash /cpfs01/shared/llm_ddd/yangyuming/OpenRLHF/cmds/ray_start_Internlm8B_SkyworkGemma27B_HH.sh"
 
     /cpfs01/shared/public/dlc create job --config /cpfs01/shared/llm_ddd/yangyuming/dlc.config \
-    /cpfs01/shared/public/dlc create job --config /cpfs01/shared/llm_ddd/yangyuming/dlc.config \
     --name $name \
     --worker_count $num_nodes \
     --kind PyTorchJob \
@@ -33,7 +29,6 @@ bash /cpfs01/shared/llm_ddd/yangyuming/OpenRLHF/cmds/ray_start_Internlm8B_Skywor
     --worker_gpu $num_gpus \
     --worker_memory $node_mems \
     --workspace_id ws1lu4iyv5yjjyvp \
-    --data_sources data1ewbw1ztmmyh,data1bgvj0n14to0,data1dfp0cngxv41,data1ubhj4714msc,data1xj7ojru0t4t,data4n4f7sfaxa5g  \
     --data_sources data1ewbw1ztmmyh,data1bgvj0n14to0,data1dfp0cngxv41,data1ubhj4714msc,data1xj7ojru0t4t,data4n4f7sfaxa5g  \
     --worker_image pjlab-shanghai-acr-registry-vpc.cn-shanghai.cr.aliyuncs.com/pjlab-eflops/lingjun-pytorch-training:2.3-24.03-gu8-gpu-py310-cu124-ubuntu22.04 \
     --worker_shared_memory 256Gi \
