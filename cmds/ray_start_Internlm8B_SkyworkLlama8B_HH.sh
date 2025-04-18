@@ -11,12 +11,12 @@ rm_name=RM_Skyworks_Llama_31_8B
 actor_pretrain_path=/cpfs01/shared/llm_ddd/liushichun1/models/internlm3-8b-instruct-wo-rl
 reward_pretrain_path=/cpfs01/shared/llm_ddd/liushichun1/models/Skywork-Reward-Llama-3.1-8B
 # reward_pretrain_path=/cpfs01/shared/llm_ddd/zouyicheng/rm_pretrain/rm/RM_SFT_reward_pt_1_8b_DATA_HH_88k_blank_patch_Node_2_LR_9e_6_STEP_658_hf
-reward_remote_url=10.130.1.147:30000
+reward_remote_url=10.130.1.182:30000
 # reward_remote_url=10.130.1.175:30000
 prompt_data_path=/cpfs01/shared/llm_ddd/zouyicheng/rm_pretrain/data/ppo/internal/train
 total_sample_num=905361
 
-name="ppo-ray-policy_${policy_model_name}-${rm_name}_data_${data_type}_bsz_${train_batch_size}_lr_5e-7_epoch_5"
+name="ppo-ray-policy_${policy_model_name}-${rm_name}_data_${data_type}_bsz_${train_batch_size}_lr_5e-7_epoch_1"
 
 save_steps=$(( (total_sample_num / rollout_batch_size) / 10 ))
 
@@ -48,11 +48,11 @@ if [ "$RANK" -eq 0 ]; then
     -- python -m openrlhf.cli.train_ppo_ray \
     --ref_num_nodes 0 \
     --ref_num_gpus_per_node 8 \
-    --critic_num_nodes 2 \
+    --critic_num_nodes 1 \
     --critic_num_gpus_per_node 8 \
-    --actor_num_nodes 2 \
+    --actor_num_nodes 1 \
     --actor_num_gpus_per_node 8 \
-    --vllm_num_engines 32 \
+    --vllm_num_engines 16 \
     --vllm_tensor_parallel_size 1 \
     --vllm_sync_backend nccl \
     --colocate_actor_ref \
@@ -78,7 +78,7 @@ if [ "$RANK" -eq 0 ]; then
     --critic_learning_rate 1e-5 \
     --actor_min_learning_rate 5e-7 \
     --critic_min_learning_rate 1e-6 \
-    --lr_warmup_ratio 0.005 \
+    --lr_warmup_ratio 0.03 \
     --critic_pretrain $actor_pretrain_path \
     --init_kl_coef 0 \
     --prompt_data json@${prompt_data_path} \

@@ -11,7 +11,7 @@ actor_pretrain_path=/cpfs01/shared/llm_ddd/zouyicheng/rm_pretrain/ckpts_val/offi
 # actor_pretrain_path=/cpfs01/shared/public/geqiming/all_models/Qwen2.5-1.5B-Instruct
 # /cpfs01/shared/llm_ddd/liushichun1/models/internlm3-8b-instruct-wo-rl
 reward_pretrain_path=/cpfs01/shared/llm_ddd/zouyicheng/rm_pretrain/rm/RM_SFT_reward_pt_1_8b_final_DATA_puyu_standard_Node_2_LR_1e-5_STEP_247_hf
-reward_remote_url=10.130.1.238:30000
+reward_remote_url=10.130.0.154:30000
 prompt_data_path=/cpfs01/shared/llm_ddd/zouyicheng/rm_pretrain/data/ppo/internal/train
 total_sample_num=905361
 
