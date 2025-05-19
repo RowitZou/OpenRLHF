@@ -334,7 +334,7 @@ class RemoteExperienceMaker(BaseExperienceMaker):
         super().__init__(*args, **kwargs)
         self.vllm_engines = vllm_engines
         self.packing_samples = packing_samples
-        self.rm_utils = RewardModelInputTool(self.rm_tokenizer)
+        self.rm_utils = RewardModelInputTool(self.rm_tokenizer, self.strategy.args.max_rm_model_length, self.strategy.args.max_rm_response_length)
         if self.custom_reward_func:
             self.custom_reward_func = ray.remote(self.custom_reward_func)
         if log_dir is not None:
@@ -509,9 +509,38 @@ class RemoteExperienceMaker(BaseExperienceMaker):
                                 think_end=args.think_end,
                             )
                         else:
-                            rm_input = self.rm_utils.apply_chat_template(
-                                rp + [{"role": "assistant", "content": response}]
+                            max_rm_response_length = args.max_rm_response_length
+                            max_rm_model_length = args.max_rm_model_length
+                            
+                            # One-off for Skywork
+                            # max_rm_response_length = 2048
+                            # max_rm_model_length = 4096
+                            # One-off for Internlm-reward
+                            # max_rm_response_length = 4096
+                            # max_rm_model_length = 16384
+                            
+                            # Truncate response from the right if too long
+                            response_ids = self.rm_utils.tokenizer.encode(response, add_special_tokens=False)
+                            if len(response_ids) > max_rm_response_length:
+                                print(
+                                    f"Response length {len(response_ids)} exceeds max_rm_response_length {max_rm_response_length}. Truncating."
+                                )
+                                response_ids = response_ids[:max_rm_response_length]
+                                response = self.rm_utils.tokenizer.decode(response_ids, skip_special_tokens=False)
+
+                            # Truncate rm_input
+                            rm_input = self.rm_utils.tokenizer.apply_chat_template(
+                                rp + [{"role": "assistant", "content": response}], tokenize=False
                             )
+                            rm_input_ids = self.rm_utils.tokenizer.encode(rm_input, add_special_tokens=False)
+                            if len(rm_input_ids) > (max_rm_model_length - 4):
+                                print(
+                                    f"Sequence length {len(rm_input_ids)} is "
+                                    f"larger than max_rm_model_length {max_rm_model_length}. Truncating.",
+                                )
+                                rm_input_ids = rm_input_ids[-(max_rm_model_length - 4):]
+                                rm_input = self.rm_utils.tokenizer.decode(rm_input_ids, skip_special_tokens=False)
+                                
                         rm_inputs.append(rm_input)
                         if self.log_file is not None:
                             self.log_file.write(

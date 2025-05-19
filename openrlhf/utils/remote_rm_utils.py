@@ -2,6 +2,7 @@ import time
 import ray
 import requests
 import torch
+import os
 
 from openrlhf.utils.logging_utils import init_logger
 from typing import List
@@ -26,11 +27,13 @@ def request_reward(text: List[str], host: str, rm: str, retry_delay=0.2, max_ret
             return rewards
         except Exception as e:
             print(f"Error requesting reward: {e}")
+            print(f"Raw response: {res.text}")
             time.sleep(retry_delay)
             continue
     print(f"Failed to request reward after {max_retries} retries")
-    with open("/cpfs01/shared/llm_ddd/zouyicheng/OpenRLHF/logs/error/error.log", "a", encoding="utf8") as f:
-        f.write(f"Text: {text}\n")
+    os.makedirs("/cpfs01/shared/alillm_hs/yangyuming/OpenRLHF/logs/error", exist_ok=True)
+    with open("/cpfs01/shared/alillm_hs/yangyuming/OpenRLHF/logs/error/error.log", "a", encoding="utf8") as f:
+        f.write(f"Host:{host}, Text: {text}\n")
     return None
 
 

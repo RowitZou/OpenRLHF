@@ -4,7 +4,7 @@
 # Configurable Variables
 #########################
 
-export HOME="/cpfs01/shared/llm_ddd/yangyuming/"
+export HOME="/cpfs01/shared/alillm_hs/yangyuming/"
 
 # === Training parameters ===
 train_batch_size=1024
@@ -15,24 +15,26 @@ data_type="Mixed_1252K"
 
 # === Model names ===
 policy_model_name="InternLM3-8B-Instruct-wo-RL"
-rm_name="RM_Internlm_20B_Reward"
+rm_name="RM_SFTOnlyinternal"
 
 # === Paths ===
-actor_pretrain_path="/cpfs01/shared/llm_ddd/liushichun1/models/internlm3-8b-instruct-wo-rl"
-reward_pretrain_path="/cpfs01/shared/llm_ddd/puyu_transfer_data/guohonglin/hf_hub/models--internlm--internlm2-20b-reward/snapshots/6539b1df85e74019a3e36da43901e18205c572ea"
-reward_remote_url="10.130.1.182:30000"
-prompt_data_path="/cpfs01/shared/llm_ddd/zouyicheng/rm_pretrain/data/ppo/mixed/train/"
+actor_pretrain_path="/cpfs01/shared/alillm_hs/liushichun1/models/internlm3-8b-instruct-wo-rl"
+reward_pretrain_path="/cpfs01/shared/alillm_hs/zouyicheng/rm_pretrain/rm/RM_SFT_internlm2_5_1_8b_DATA_puyu_standard_Node_2_LR_1e_5_STEP_247_hf"
+reward_remote_url="10.130.1.172:30000"
+prompt_data_path="/cpfs01/shared/alillm_hs/zouyicheng/rm_pretrain/data/ppo/mixed/train/"
 total_sample_num=1252429
 
 # === Ray & DLC settings ===
 dlc_workspace_id="ws1lu4iyv5yjjyvp"
 dlc_data_sources="data1ewbw1ztmmyh,data1bgvj0n14to0,data1dfp0cngxv41,data1ubhj4714msc,data1xj7ojru0t4t,data4n4f7sfaxa5g"
+# dlc_workspace_id="wssp4wsoiyvfp6ww"
+# dlc_data_sources="data1ewbw1ztmmyh,data1bgvj0n14to0,data1dfp0cngxv41,data1ubhj4714msc,data1xj7ojru0t4t,data4n4f7sfaxa5g,data1o8qdjce0kd0"
 docker_image="pjlab-shanghai-acr-registry-vpc.cn-shanghai.cr.aliyuncs.com/pjlab-eflops/lingjun-pytorch-training:2.3-24.03-gu8-gpu-py310-cu124-ubuntu22.04"
 
 # === Derived settings ===
 name="ppo-ray-policy_${policy_model_name}-${rm_name}_data_${data_type}_bsz_${train_batch_size}_lr_${lr}_epoch_${epoch}"
 save_steps=$(( (total_sample_num / rollout_batch_size) / 15 ))
-ray_script_path="/cpfs01/shared/llm_ddd/yangyuming/OpenRLHF"
+ray_script_path="/cpfs01/shared/alillm_hs/yangyuming/OpenRLHF"
 target_file="${ray_script_path}/addr/addr_${name}.txt"
 
 # === Set rank and master address ===
@@ -48,10 +50,10 @@ cur_script_path=$(realpath "$0")
 if [ -z "$RUN_FROM_DLC" ] && [ "$RANK" -eq 0 ]; then
     echo "⏳ Submitting DLC job: $name"
 
-    cmd="sudo su && . /cpfs01/shared/llm_ddd/zouyicheng/.bashrc && cd $ray_script_path && conda activate rlhf && \
+    cmd="sudo su && . /cpfs01/shared/alillm_hs/zouyicheng/.bashrc && cd $ray_script_path && conda activate rlhf && \
 export RUN_FROM_DLC=1 && bash $cur_script_path"
 
-    /cpfs01/shared/public/dlc create job --config /cpfs01/shared/llm_ddd/yangyuming/dlc.config \
+    /cpfs01/shared/public/dlc create job --config /cpfs01/shared/alillm_hs/yangyuming/dlc.config \
         --name "$name" \
         --worker_count 4 \
         --kind PyTorchJob \
@@ -98,6 +100,7 @@ if [ "$RANK" -eq 0 ]; then
             --vllm_tensor_parallel_size 1 \
             --vllm_sync_backend nccl \
             --colocate_actor_ref \
+            --ref_mode \
             --pretrain "$actor_pretrain_path" \
             --remote_rm_url "$reward_remote_url" \
             --reward_pretrain "$reward_pretrain_path" \

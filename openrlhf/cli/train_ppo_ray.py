@@ -195,6 +195,8 @@ if __name__ == "__main__":
 
     # ref
     parser.add_argument("--ref_mode", action="store_true", default=False, help="training ppo using ref-mode.")
+    parser.add_argument("--max_rm_model_length", type=int, default=16384, help="max length of reward model")
+    parser.add_argument("--max_rm_response_length", type=int, default=4096, help="max length of reward model response")
 
     # reward model mean/std
     parser.add_argument("--reward_mean", type=float, default=0.0, help="mean of reward model")
