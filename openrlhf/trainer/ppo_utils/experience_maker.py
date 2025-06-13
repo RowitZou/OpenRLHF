@@ -162,7 +162,7 @@ class RewardModelInputTool():
         _reference_cat = p1 + r1 if wrapper == "pretrain" or len(r1) == "" else p1 + "\n" + r1
         _output_cat = p2 + r2 if wrapper == "pretrain" or len(r2) == "" else p2 + "\n" + r2
 
-        final_txt = _reference_cat + "<|reward|>" + _output_cat
+        final_txt = _reference_cat + "<|reward|>" + _output_cat + "[UNUSED_TOKEN_130]"
 
         return final_txt
 
